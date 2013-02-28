@@ -1,0 +1,127 @@
+<?php
+include "conn.inc.php";
+
+/*
+$model = new OptionsModel("localhost", "root", "password", "tvland_tagging_v2");
+
+$array = $model->getResults($TIME);
+*/
+
+//parse string into array
+$channelNumbers = $_POST["channelNumbers"];
+$channels = explode(",", $channelNumbers);
+
+//If no, reset the arry to empty
+if ($_POST["channelNumber"] == "no") {
+    $channels = array(0);
+}
+
+$query = "SELECT * FROM tunein_day ORDER BY name ASC";
+$result = mysql_query($query) or die ('Error: '.mysql_error ());
+$num = mysql_num_rows($result);
+
+while($row = mysql_fetch_array($result)) {
+    $rows[] = $row;
+}
+
+$query2 = "SELECT * FROM tunein_time ORDER BY name ASC";
+$result2 = mysql_query($query2) or die ('Error: '.mysql_error ());
+$num2 = mysql_num_rows($result2);
+
+while($row2 = mysql_fetch_array($result2)) {
+    $rows2[] = $row2;
+}
+
+$query3 = "SELECT * FROM tunein_modifier ORDER BY name ASC";
+$result3 = mysql_query($query3) or die ('Error: '.mysql_error ());
+$num3 = mysql_num_rows($result3);
+
+while($row3 = mysql_fetch_array($result3)) {
+    $modifierRadio = $_POST['modifierRadio'];
+    if ($modifierRadio == $row3['key']) {
+        $modifier = $row3['ai_source_layer']; 
+        $modifier2 = $row3['replacement_text']; 
+    }
+}
+
+mysql_free_result($result);
+mysql_free_result($result2);
+mysql_free_result($result3);
+
+//$xml = new SimpleXMLElement('<Job />');
+$xml = simplexml_load_string('<?xml version="1.0" encoding="UTF-8"?><Job />');
+
+foreach($channels as $channel){
+    foreach($rows2 as $row2){
+        $time = $_POST["time".$row2['key']];
+        if ($time == "on") {
+
+            foreach($rows as $row){
+                $day = $_POST["day".$row['key']];
+                $dayTime = $_POST["day".$row['key']."Radio"];
+                if ($day != "") {
+                    $comp = $xml->addChild('Comp');
+                    $comp->addChild('Template', $_POST["templateName"]);
+                    if ($_POST["channelNumber"] == "yes") {
+                        $showChannel = " ".$channel;
+                    } else {
+                        $showChannel = "";
+                    }
+                    $comp->addChild('NewName', $_POST["dupeName"]." ".$row['ai_source_layer'].$showChannel);
+                    $sourceReplacements = $comp->addChild('SourceReplacements');
+                    $Replace = $sourceReplacements->addChild('Replace');
+                    $Replace->addChild('Layer', 'EP TUNEIN DAY');
+                    $Replace->addChild('Source', 'EP_'.$row['ai_source_layer'].'/tuneins.ai');
+                    $Replace2 = $sourceReplacements->addChild('Replace');
+                    $Replace2->addChild('Layer', 'EP TUNEIN TIME');
+                    if ($dayTime == "yes") {
+                        $Replace2->addChild('Source', 'EP_'.$row2['ai_source_layer'].'/tuneins.ai');
+                    } else {
+                        $Replace2->addChild('Source');
+                    }
+                    $Replace3 = $sourceReplacements->addChild('Replace');
+                    $Replace3->addChild('Layer', 'EP MODIFIER');
+                    $Replace3->addChild('Source', 'EP_'.$modifier.'/tuneins.ai');
+                    $Replace4 = $sourceReplacements->addChild('Replace');
+                    $Replace4->addChild('Layer', 'INT TUNEIN DAY');
+                    $Replace4->addChild('Source', 'INT_'.$row['ai_source_layer'].'/tuneins.ai');
+                    $Replace5 = $sourceReplacements->addChild('Replace');
+                    $Replace5->addChild('Layer', 'INT TUNEIN TIME');
+                    if ($dayTime == "yes") {
+                        $Replace5->addChild('Source', 'INT_'.$row2['ai_source_layer'].'/tuneins.ai');
+                    } else {
+                        $Replace5->addChild('Source');
+                    }
+                    $Replace6 = $sourceReplacements->addChild('Replace');
+                    $Replace6->addChild('Layer', 'INT MODIFIER');
+                    $Replace6->addChild('Source', 'INT_'.$modifier.'/tuneins.ai');
+                    $textReplacements = $comp->addChild('TextReplacements');
+                    $Replace7 = $textReplacements->addChild('Replace');
+                    $Replace7->addChild('Layer', 'L3 TAG');
+                    if ($dayTime == "yes") {
+                        $Replace7->addChild('Text', $modifier2.' '.$row['replacement_text'].' '.$row2['replacement_text']);
+                    } else {
+                        $Replace7->addChild('Text', $modifier2.' '.$row['replacement_text']);
+                    }
+                    $Replace8 = $textReplacements->addChild('Replace');
+                    $Replace8->addChild('Layer', 'L3 CHANNEL');
+                    $Replace8->addChild('Text', $showChannel);
+                    $Replace8->addChild('MaintainSpacing', 'L3 TAG');
+                    $Replace9 = $textReplacements->addChild('Replace');
+                    $Replace9->addChild('Layer', 'EP CHANNEL');
+                    $Replace9->addChild('Text', $showChannel);
+                }
+
+            }
+        }
+    }
+}
+
+header('Content-Description: File Transfer');
+Header('Content-type: text/xml');
+header("Content-disposition: attachment; filename=comps.xml");
+
+$dom = dom_import_simplexml($xml)->ownerDocument;
+$dom->formatOutput = true;
+echo $dom->saveXML();
+?>
